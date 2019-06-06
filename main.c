@@ -63,12 +63,10 @@ static char VERSION[] = "XX.YY.ZZ";
 #define STRIP_TYPE              WS2811_STRIP_GBR		// WS2812/SK6812RGB integrated chip+leds
 //#define STRIP_TYPE            SK6812_STRIP_RGBW		// SK6812RGBW (NOT SK6812RGB)
 
-#define WIDTH                   8
-#define HEIGHT                  8
-#define LED_COUNT               (WIDTH * HEIGHT)
+#define WIDTH                   12
+#define LED_COUNT               (WIDTH)
 
 int width = WIDTH;
-int height = HEIGHT;
 int led_count = LED_COUNT;
 
 int clear_on_exit = 0;
@@ -103,43 +101,22 @@ static uint8_t running = 1;
 
 void matrix_render(void)
 {
-    int x, y;
+    int x;
 
     for (x = 0; x < width; x++)
     {
-        for (y = 0; y < height; y++)
-        {
-            ledstring.channel[0].leds[(y * width) + x] = matrix[y * width + x];
-        }
-    }
-}
-
-void matrix_raise(void)
-{
-    int x, y;
-
-    for (y = 0; y < (height - 1); y++)
-    {
-        for (x = 0; x < width; x++)
-        {
-            // This is for the 8x8 Pimoroni Unicorn-HAT where the LEDS in subsequent
-            // rows are arranged in opposite directions
-            matrix[y * width + x] = matrix[(y + 1)*width + width - x - 1];
-        }
+		ledstring.channel[0].leds[x] = matrix[x];
     }
 }
 
 void matrix_clear(void)
 {
-    int x, y;
+    int x;
 
-    for (y = 0; y < (height ); y++)
-    {
-        for (x = 0; x < width; x++)
-        {
-            matrix[y * width + x] = 0;
-        }
-    }
+	for (x = 0; x < width; x++)
+	{
+		matrix[x] = 0;
+	}
 }
 
 int dotspos[] = { 0, 1, 2, 3, 4, 5, 6, 7 };
@@ -181,9 +158,9 @@ void matrix_bottom(void)
         }
 
         if (ledstring.channel[0].strip_type == SK6812_STRIP_RGBW) {
-            matrix[dotspos[i] + (height - 1) * width] = dotcolors_rgbw[i];
+            matrix[dotspos[i]] = dotcolors_rgbw[i];
         } else {
-            matrix[dotspos[i] + (height - 1) * width] = dotcolors[i];
+            matrix[dotspos[i]] = dotcolors[i];
         }
     }
 }
@@ -219,7 +196,6 @@ void parseargs(int argc, char **argv, ws2811_t *ws2811)
 		{"invert", no_argument, 0, 'i'},
 		{"clear", no_argument, 0, 'c'},
 		{"strip", required_argument, 0, 's'},
-		{"height", required_argument, 0, 'y'},
 		{"width", required_argument, 0, 'x'},
 		{"version", no_argument, 0, 'v'},
 		{0, 0, 0, 0}
@@ -246,7 +222,6 @@ void parseargs(int argc, char **argv, ws2811_t *ws2811)
 				"-h (--help)    - this information\n"
 				"-s (--strip)   - strip type - rgb, grb, gbr, rgbw\n"
 				"-x (--width)   - matrix width (default 8)\n"
-				"-y (--height)  - matrix height (default 8)\n"
 				"-d (--dma)     - dma channel to use (default 10)\n"
 				"-g (--gpio)    - GPIO to use\n"
 				"                 If omitted, default is 18 (PWM0)\n"
@@ -300,23 +275,11 @@ void parseargs(int argc, char **argv, ws2811_t *ws2811)
 			}
 			break;
 
-		case 'y':
-			if (optarg) {
-				height = atoi(optarg);
-				if (height > 0) {
-					ws2811->channel[0].count = height * width;
-				} else {
-					printf ("invalid height %d\n", height);
-					exit (-1);
-				}
-			}
-			break;
-
 		case 'x':
 			if (optarg) {
 				width = atoi(optarg);
 				if (width > 0) {
-					ws2811->channel[0].count = height * width;
+					ws2811->channel[0].count = width;
 				} else {
 					printf ("invalid width %d\n", width);
 					exit (-1);
@@ -380,7 +343,7 @@ int main(int argc, char *argv[])
 
     parseargs(argc, argv, &ledstring);
 
-    matrix = malloc(sizeof(ws2811_led_t) * width * height);
+    matrix = malloc(sizeof(ws2811_led_t) * width);
 
     setup_handlers();
 
@@ -392,7 +355,6 @@ int main(int argc, char *argv[])
 
     while (running)
     {
-        matrix_raise();
         matrix_bottom();
         matrix_render();
 
