@@ -57,6 +57,7 @@ static char VERSION[] = "XX.YY.ZZ";
 #include "ws2811.h"
 
 #define PORT 9999
+#define MAXMSG 100
 
 #define ARRAY_SIZE(stuff)       (sizeof(stuff) / sizeof(stuff[0]))
 
@@ -396,20 +397,32 @@ void *listener(void *threadid)
 {
 	long tid;
 	tid = (long)threadid;
-	printf("Spawned %lo", tid);
+	printf("Spawned %lo\n", tid);
 	sock = socket_init();
-	int new_socket, c;
+	int client_socket, c;
 	struct sockaddr_in client;
 
-	while(running) {
-		listen(sock, 3);
-		new_socket = accept(sock, (struct sockaddr *)&client, (socklen_t*)&c);
-		if (new_socket<0) {
-			perror("Accept Failed");
-		}
-		puts("Connection Accepted");
-		initialized=1;
+	char recieve[MAXMSG];
+
+	listen(sock, 3);
+	client_socket = accept(sock, (struct sockaddr *)&client, (socklen_t*)&c);
+	if (client_socket < 0) {
+		perror("Accept Failed");
 	}
+	puts("Connection Accepted");
+	initialized=1;
+
+	int bytes = 0;
+
+	while(running) {
+		bytes = read(client_socket, recieve, MAXMSG);
+		if (bytes < 0)
+		{
+			puts("Read Error!");
+		}
+	}
+	close(sock);
+	close(new_socket);
 	pthread_exit(NULL);
 }
 
@@ -418,7 +431,7 @@ void *render(void *threadid)
 	ws2811_return_t ret;
 	long tid;
 	tid = (long)threadid;
-	printf("Spawned %lo", tid);
+	printf("Spawned %lo\n", tid);
 
 	while(running) {
 		matrix_render();
