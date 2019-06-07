@@ -42,7 +42,11 @@ static char VERSION[] = "XX.YY.ZZ";
 #include <signal.h>
 #include <stdarg.h>
 #include <getopt.h>
+#include <pthread.h>
 
+#include <netinet/in.h>
+#include <sys/socket.h>
+#include <arpa/inet.h>
 
 #include "clk.h"
 #include "gpio.h"
@@ -52,6 +56,7 @@ static char VERSION[] = "XX.YY.ZZ";
 
 #include "ws2811.h"
 
+#define PORT 9999
 
 #define ARRAY_SIZE(stuff)       (sizeof(stuff) / sizeof(stuff[0]))
 
@@ -63,11 +68,12 @@ static char VERSION[] = "XX.YY.ZZ";
 #define STRIP_TYPE              WS2811_STRIP_GBR		// WS2812/SK6812RGB integrated chip+leds
 //#define STRIP_TYPE            SK6812_STRIP_RGBW		// SK6812RGBW (NOT SK6812RGB)
 
-#define WIDTH                   12
-#define LED_COUNT               (WIDTH)
+#define LED_COUNT               12
 
-int width = WIDTH;
 int led_count = LED_COUNT;
+
+int port = PORT;
+int sock;
 
 int clear_on_exit = 0;
 
@@ -103,7 +109,7 @@ void matrix_render(void)
 {
     int x;
 
-    for (x = 0; x < width; x++)
+    for (x = 0; x < led_count; x++)
     {
 		ledstring.channel[0].leds[x] = matrix[x];
     }
@@ -113,7 +119,7 @@ void matrix_clear(void)
 {
     int x;
 
-	for (x = 0; x < width; x++)
+	for (x = 0; x < led_count; x++)
 	{
 		matrix[x] = 0;
 	}
@@ -152,7 +158,7 @@ void matrix_bottom(void)
     for (i = 0; i < (int)(ARRAY_SIZE(dotspos)); i++)
     {
         dotspos[i]++;
-        if (dotspos[i] > (width - 1))
+        if (dotspos[i] > (led_count - 1))
         {
             dotspos[i] = 0;
         }
@@ -196,8 +202,9 @@ void parseargs(int argc, char **argv, ws2811_t *ws2811)
 		{"invert", no_argument, 0, 'i'},
 		{"clear", no_argument, 0, 'c'},
 		{"strip", required_argument, 0, 's'},
-		{"width", required_argument, 0, 'x'},
+		{"led_count", required_argument, 0, 'x'},
 		{"version", no_argument, 0, 'v'},
+		{"port", required_argument, 0, 'p'},
 		{0, 0, 0, 0}
 	};
 
@@ -221,7 +228,7 @@ void parseargs(int argc, char **argv, ws2811_t *ws2811)
 			fprintf(stderr, "Usage: %s \n"
 				"-h (--help)    - this information\n"
 				"-s (--strip)   - strip type - rgb, grb, gbr, rgbw\n"
-				"-x (--width)   - matrix width (default 8)\n"
+				"-x (--led_count)   - led count (default 12)\n"
 				"-d (--dma)     - dma channel to use (default 10)\n"
 				"-g (--gpio)    - GPIO to use\n"
 				"                 If omitted, default is 18 (PWM0)\n"
@@ -232,6 +239,10 @@ void parseargs(int argc, char **argv, ws2811_t *ws2811)
 			exit(-1);
 
 		case 'D':
+			break;
+
+		case 'p':
+			port = atoi(optarg);
 			break;
 
 		case 'g':
@@ -277,11 +288,11 @@ void parseargs(int argc, char **argv, ws2811_t *ws2811)
 
 		case 'x':
 			if (optarg) {
-				width = atoi(optarg);
-				if (width > 0) {
-					ws2811->channel[0].count = width;
+				led_count = atoi(optarg);
+				if (led_count > 0) {
+					ws2811->channel[0].count = led_count;
 				} else {
-					printf ("invalid width %d\n", width);
+					printf ("invalid led count %d\n", led_count);
 					exit (-1);
 				}
 			}
@@ -334,6 +345,72 @@ void parseargs(int argc, char **argv, ws2811_t *ws2811)
 	}
 }
 
+int socket_init(void)
+{
+	int socket_desc;
+	struct sockaddr_in server;
+
+	//Create socket
+	socket_desc = socket(AF_INET, SOCK_STREAM, 0);
+	if(socket_desc == -1)
+	{
+		printf("Could not create socket");
+	}
+
+	// Prepare the sockaddr_in structure
+	server.sin_family = AF_INET;
+	server.sin_addr.s_addr = inet_addr("127.0.0.1");
+	server.sin_port = htons(port);
+
+	// Bind
+	if(bind(socket_desc, (struct sockaddr *)&server, sizeof(server)) < 0)
+	{
+		puts("bind failed");
+	}
+	puts("bind done");
+
+	return socket_desc;
+}
+
+void startup() 
+{
+	int idx = 0;
+	while(running)
+	{
+		++idx;
+		idx %= led_count;
+		if(matrix[idx] == 0)
+		{
+			matrix[idx] = 0x00505050;
+		} else {
+			matrix[idx] = 0;
+		}
+		// 30 frames /sec
+		usleep(1000000 / 15);
+	}
+}
+
+void *render(void *threadid)
+{
+	ws2811_return_t ret;
+	long tid;
+	tid = (long)threadid;
+	printf("Spawned %lo", tid);
+
+	while(running) {
+		matrix_render();
+
+		if ((ret = ws2811_render(&ledstring)) != WS2811_SUCCESS)
+		{
+			fprintf(stderr, "ws2811_render failed: %s\n", ws2811_get_return_t_str(ret));
+			break;
+		}
+
+		// 30 frames /sec
+		usleep(1000000 / 30);
+	}
+	pthread_exit(NULL);
+}
 
 int main(int argc, char *argv[])
 {
@@ -343,7 +420,7 @@ int main(int argc, char *argv[])
 
     parseargs(argc, argv, &ledstring);
 
-    matrix = malloc(sizeof(ws2811_led_t) * width);
+    matrix = malloc(sizeof(ws2811_led_t) * led_count);
 
     setup_handlers();
 
@@ -353,25 +430,23 @@ int main(int argc, char *argv[])
         return ret;
     }
 
-    while (running)
-    {
-        matrix_bottom();
-        matrix_render();
+	sock = socket_init();
 
-        if ((ret = ws2811_render(&ledstring)) != WS2811_SUCCESS)
-        {
-            fprintf(stderr, "ws2811_render failed: %s\n", ws2811_get_return_t_str(ret));
-            break;
-        }
+	// Spawn render thread
+	pthread_t thread;
+	printf("Spawning render thread\n");
+	int rc = pthread_create(&thread, NULL, render, 0);
+	if(rc) {
+		printf("ERROR: return code %d", rc);
+		exit(-1);
+	}
 
-        // 15 frames /sec
-        usleep(1000000 / 15);
-    }
+	startup();
 
     if (clear_on_exit) {
-	matrix_clear();
-	matrix_render();
-	ws2811_render(&ledstring);
+		matrix_clear();
+		matrix_render();
+		ws2811_render(&ledstring);
     }
 
     ws2811_fini(&ledstring);
