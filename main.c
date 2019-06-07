@@ -104,6 +104,7 @@ ws2811_t ledstring =
 ws2811_led_t *matrix;
 
 static uint8_t running = 1;
+static uint8_t initialized = 0;
 
 void matrix_render(void)
 {
@@ -375,7 +376,7 @@ int socket_init(void)
 void startup() 
 {
 	int idx = 0;
-	while(running)
+	while(!initialized)
 	{
 		++idx;
 		idx %= led_count;
@@ -388,6 +389,28 @@ void startup()
 		// 30 frames /sec
 		usleep(1000000 / 15);
 	}
+	matrix_clear();
+}
+
+void *listener(void *threadid)
+{
+	long tid;
+	tid = (long)threadid;
+	printf("Spawned %lo", tid);
+	sock = socket_init();
+	int new_socket, c;
+	struct sockaddr_in client;
+
+	while(running) {
+		listen(sock, 3);
+		new_socket = accept(sock, (struct sockaddr *)&client, (socklen_t*)&c);
+		if (new_socket<0) {
+			perror("Accept Failed");
+		}
+		puts("Connection Accepted");
+		initialized=1;
+	}
+	pthread_exit(NULL);
 }
 
 void *render(void *threadid)
@@ -415,6 +438,7 @@ void *render(void *threadid)
 int main(int argc, char *argv[])
 {
     ws2811_return_t ret;
+	int rc;
 
     sprintf(VERSION, "%d.%d.%d", VERSION_MAJOR, VERSION_MINOR, VERSION_MICRO);
 
@@ -430,18 +454,28 @@ int main(int argc, char *argv[])
         return ret;
     }
 
-	sock = socket_init();
+	// Spawn listener thread
+	pthread_t sock_thread;
+	printf("Spawning socket thread\n");
+	rc = pthread_create(&sock_thread, NULL, listener, 0);
+	if(rc) {
+		printf("ERROR: return code %d", rc);
+		exit(-1);
+	}
 
 	// Spawn render thread
 	pthread_t thread;
 	printf("Spawning render thread\n");
-	int rc = pthread_create(&thread, NULL, render, 0);
+	rc = pthread_create(&thread, NULL, render, 0);
 	if(rc) {
 		printf("ERROR: return code %d", rc);
 		exit(-1);
 	}
 
 	startup();
+
+	pthread_join(sock_thread, NULL);
+	pthread_join(thread, NULL);
 
     if (clear_on_exit) {
 		matrix_clear();
