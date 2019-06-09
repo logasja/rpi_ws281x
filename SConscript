@@ -51,6 +51,7 @@ ws2811_slib = tools_env.SharedLibrary('libws2811', lib_srcs)
 
 # Test Program
 srcs = Split('''
+    ledstring.c
     main.c
 ''')
 
