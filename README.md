@@ -102,15 +102,18 @@ reponsibility for damage, harm, or mistakes.
 ./test version 1.1.0
 Usage: ./test
 -h (--help)    - this information
--s (--strip)   - strip type - rgb, grb, gbr, rgbw
--x (--width)   - matrix width (default 8)
--y (--height)  - matrix height (default 8)
--d (--dma)     - dma channel to use (default 10)
--g (--gpio)    - GPIO to use
-                 If omitted, default is 18 (PWM0)
--i (--invert)  - invert pin output (pulse LOW)
--c (--clear)   - clear matrix on exit.
+-p (--port)    - sets tcp port
 -v (--version) - version information
+```
+
+### Port Interface:
+
+- Connect to the port you set the server to run on (default is 9999).
+- This port is only available by default on the local host.
+
+#### Initialization
+```
+setup <channel>
 ```
 
 ### Important warning about DMA channels

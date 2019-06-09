@@ -210,7 +210,7 @@ void *listener(void *threadid)
 {
 	long tid;
 	tid = (long)threadid;
-	printf("Spawned %lo\n", tid);
+	fprintf(stderr, "Spawned %lo\n", tid);
 	sock = socket_init();
 	int client_socket, c;
 	struct sockaddr_in client;
@@ -220,20 +220,23 @@ void *listener(void *threadid)
 	listen(sock, 3);
 	client_socket = accept(sock, (struct sockaddr *)&client, (socklen_t*)&c);
 	if (client_socket < 0) {
-		perror("Accept Failed");
+		fprintf(stderr,"Accept Failed");
 	}
-	puts("Connection Accepted");
 	initialized=1;
 
 	int bytes = 0;
 
 	while(running) {
+		for(int i=0; i < MAXMSG; i++)
+		{
+			recieve[i] = 0;
+		}
 		bytes = read(client_socket, recieve, MAXMSG);
 		if (bytes < 0)
 		{
-			puts("Read Error!");
+			fprintf(stderr,"Read Error!");
 		}
-		puts(recieve);
+		printf(recieve);
 	}
 	close(sock);
 	close(client_socket);
@@ -244,7 +247,7 @@ void *render(void *threadid)
 {
 	long tid;
 	tid = (long)threadid;
-	printf("Spawned %lo\n", tid);
+	fprintf(stderr, "Spawned %lo\n", tid);
 
 	while(running) {
 		render_ledstring();
@@ -278,7 +281,7 @@ int main(int argc, char *argv[])
 	printf("Spawning socket thread\n");
 	rc = pthread_create(&sock_thread, NULL, listener, 0);
 	if(rc) {
-		printf("ERROR: return code %d", rc);
+		fprintf(stderr, "ERROR: return code %d", rc);
 		exit(-1);
 	}
 
@@ -287,7 +290,7 @@ int main(int argc, char *argv[])
 	printf("Spawning render thread\n");
 	rc = pthread_create(&render_thread, NULL, render, 0);
 	if(rc) {
-		printf("ERROR: return code %d", rc);
+		fprintf(stderr, "ERROR: return code %d", rc);
 		exit(-1);
 	}
 
@@ -303,6 +306,6 @@ int main(int argc, char *argv[])
 
 	fini_ledstring();
 
-    printf ("\n");
+    fprintf (stderr,"\n");
 	return 0;
 }
