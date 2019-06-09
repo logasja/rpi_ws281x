@@ -111,9 +111,36 @@ Usage: ./test
 - Connect to the port you set the server to run on (default is 9999).
 - This port is only available by default on the local host.
 
+#### Help Message
+- Sending 'help' to the socket will provide a message explaining how to use the interface.
+
 #### Initialization
 ```
-setup <channel>
+setup  
+    setup 
+		-c <channel>, 						#channel number
+		-n <led_count>, 					#number of leds in channel
+		-t <led_type>, 					#type of led (3 color or 4 color) default 0
+		-i <invert>, 						#invert output, default 0
+		-b <global_brightness>, 			#global brightness level for channel (0-255), default 255
+		-g <gpionum>						#GPIO output number, default 18 for more see 'GPIO usage' at this page: [https://github.com/jgarff/rpi_ws281x](https://github.com/jgarff/rpi_ws281x)
+	
+	Possible LED types:
+		0 WS2811_STRIP_RGB
+		1  WS2811_STRIP_RBG
+		2  WS2811_STRIP_GRB
+		3  WS2811_STRIP_GBR
+		4  WS2811_STRIP_BRG
+		5  WS2811_STRIP_BGR
+		6  SK6812_STRIP_RGBW
+		7  SK6812_STRIP_RBGW
+		8  SK6812_STRIP_GRBW
+		9  SK6812_STRIP_GBRW
+		10 SK6812_STRIP_BRGW
+		11 SK6812_STRIP_BGRW
+
+    Example:
+    setup -c 1 -n 10 -t 0
 ```
 
 ### Important warning about DMA channels

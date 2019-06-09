@@ -36,12 +36,31 @@ extern "C" {
 
 #include "ws2811.h"
 
+// Initialization
 int init_ledstring(int n_led, int target_freq, int gpio_pin, int dma, int strip_type);
+int reinit_ledstring(void);
+
+// Deinitialization
 void fini_ledstring(void);
+
+// Change ledstring struct
+void set_ledstring_n_led(int n_led);
+void set_ledstring_target_freq(int target_freq);
+void set_ledstring_gpio_pin(int gpio_pin);
+void set_ledstring_dma(int dma);
+void set_ledstring_strip_type(int strip_type);
+void set_ledstring_global_brightness(int global_brightness);
+void set_ledstring_invert(int invert);
+
+// Set LEDs to color
 void write_led(int idx, ws2811_led_t val);
 void write_leds(ws2811_led_t *vec);
 void clear_ledstring(void);
+
+// Calls render function, sends LED values to hardware
 int render_ledstring(void);
+
+// Retrieves current LED values
 const ws2811_led_t* get_led_values(void);
 ws2811_led_t get_led_value(int idx);
 
