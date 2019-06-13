@@ -89,12 +89,6 @@ void parseargs(int argc, char **argv)
 	static struct option longopts[] =
 	{
 		{"help", no_argument, 0, 'h'},
-		{"dma", required_argument, 0, 'd'},
-		{"gpio", required_argument, 0, 'g'},
-		{"invert", no_argument, 0, 'i'},
-		{"clear", no_argument, 0, 'c'},
-		{"strip", required_argument, 0, 's'},
-		{"led_count", required_argument, 0, 'x'},
 		{"version", no_argument, 0, 'v'},
 		{"port", required_argument, 0, 'p'},
 		{0, 0, 0, 0}
@@ -104,7 +98,7 @@ void parseargs(int argc, char **argv)
 	{
 
 		index = 0;
-		c = getopt_long(argc, argv, "cd:g:his:vx:y:", longopts, &index);
+		c = getopt_long(argc, argv, "hvp:", longopts, &index);
 
 		if (c == -1)
 			break;
@@ -180,10 +174,87 @@ int socket_init(void)
 	if(bind(socket_desc, (struct sockaddr *)&server, sizeof(server)) < 0)
 	{
 		puts("bind failed");
+		exit(-1);
 	}
 	puts("bind done");
 
 	return socket_desc;
+}
+
+#define MAXARGS		64
+
+void parsecommand(int argc, char **argv)
+{
+	int opt;
+
+	char* command = argv[0];
+
+	fprintf(stderr,"Command: %s\n", argv[0]);
+
+	if(!strcmp(command, "setup"))
+	{
+		fprintf(stderr, "In setup\n");
+		while ((opt = getopt(argc, argv, "n:f:g:d:t:b:i")) != -1)
+		{
+			fprintf(stderr, "%s", optarg);
+			switch(opt) {
+				case 'n': set_ledstring_n_led(atoi(optarg)); break;
+				case 'f': set_ledstring_target_freq(atoi(optarg)); break;
+				case 'g': set_ledstring_gpio_pin(atoi(optarg)); break;
+				case 'd': set_ledstring_dma(atoi(optarg)); break;
+				case 't': set_ledstring_strip_type(atoi(optarg)); break;
+				case 'b': set_ledstring_global_brightness(atoi(optarg)); break;
+				case 'i': set_ledstring_invert(1); break;
+				default: break;
+			}
+		}
+	} 
+	else if (!strcmp(command, "init\n")) 
+	{
+		fprintf(stderr, "In init\n");
+		// Stop render loop
+		initialized = 0;
+		reinit_ledstring();
+		// Restart render loop
+		initialized = 1;
+	} 
+	else if (!strcmp(command, "write"))
+	{
+		fprintf(stderr, "In write\n");
+		int idx = 0;
+		ws2811_led_t color = 0;
+		while ((opt = getopt(argc, argv, "i:c:")) != -1)
+		{
+			fprintf(stderr, "%s", optarg);
+			switch(opt) {
+				case 'i': idx = atoi(optarg); break;
+				case 'c': color = strtol(optarg, NULL, 16); break;
+				default: break;
+			}
+		}
+		fprintf(stderr, "Setting %d to %x\n", idx, color);
+		write_led(idx, color);
+	} 
+	else {
+		fprintf(stderr, "Not a command\n");
+	}
+
+	optind = 1;
+}
+
+void execute_command(char* command)
+{
+	int argc = 0;
+	char *argv[MAXARGS];
+
+	char *p1 = strtok(command, " ");
+	while (p1 && argc < MAXARGS-1)
+	{
+		argv[argc++] = p1;
+		p1 = strtok(0, " ");
+	}
+	argv[argc] = 0;
+	parsecommand(argc, argv);
 }
 
 void *listener(void *threadid)
@@ -200,7 +271,7 @@ void *listener(void *threadid)
 	listen(sock, 3);
 	client_socket = accept(sock, (struct sockaddr *)&client, (socklen_t*)&c);
 	if (client_socket < 0) {
-		fprintf(stderr,"Accept Failed");
+		fprintf(stderr,"Accept Failed\n");
 	}
 	connected=1;
 
@@ -216,7 +287,8 @@ void *listener(void *threadid)
 		{
 			fprintf(stderr,"Read Error!");
 		}
-		printf(recieve);
+		fprintf(stderr, recieve);
+		execute_command(recieve);
 	}
 	close(sock);
 	close(client_socket);
@@ -240,50 +312,15 @@ void *render(void *threadid)
 	pthread_exit(NULL);
 }
 
+// Flashing single led
 void startup() 
 {
-	int idx = 0;
 	while(!connected)
 	{
-		++idx;
-		idx %= LED_COUNT;
-		if(get_led_value(idx) == 0x00050500)
-		{
-			write_led(idx, 0x00050505);
-		} else if (get_led_value(idx) == 0x00050505) {
-			write_led(idx, 0x00000505);	
-		}else {
-			write_led(idx, 0x00050500);
-		}
-		// 30 frames /sec
-		usleep(1000000 / 15);
-	}
-	clear_ledstring();
-}
-
-void test()
-{
-	initialized = 0;
-	clear_ledstring();
-	render_ledstring();
-	set_ledstring_n_led(12);
-	reinit_ledstring();
-	initialized = 1;
-
-	int idx = 0;
-	while(connected)
-	{
-		++idx;
-		idx %= 12;
-		if(get_led_value(idx) == 0x00505000)
-		{
-			write_led(idx, 0x00505050);
-		} else if (get_led_value(idx) == 0x00505050) {
-			write_led(idx, 0x000005050);	
-		}else {
-			write_led(idx, 0x00505000);
-		}
-		usleep(1000000 / 15);
+		write_led(0, 0x00050505);
+		usleep(1000000);
+		write_led(0, 0);
+		usleep(1000000);
 	}
 	clear_ledstring();
 }
@@ -327,8 +364,6 @@ int main(int argc, char *argv[])
 	}
 
 	startup();
-
-	test();
 
 	pthread_join(sock_thread, NULL);
 	pthread_join(render_thread, NULL);
