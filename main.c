@@ -70,6 +70,9 @@ static char VERSION[] = "XX.YY.ZZ";
 #define STRIP_TYPE              WS2811_STRIP_GBR		// WS2812/SK6812RGB integrated chip+leds
 //#define STRIP_TYPE            SK6812_STRIP_RGBW		// SK6812RGBW (NOT SK6812RGB)
 
+#define TIMEOUT_SECS			5
+#define TIMEOUT_USECS			0
+
 #define LED_COUNT               2
 
 int port = PORT;
@@ -170,6 +173,12 @@ int socket_init(void)
 	server.sin_addr.s_addr = inet_addr("127.0.0.1");
 	server.sin_port = htons(port);
 
+	// Socket options
+	struct timeval tv;
+	tv.tv_sec = TIMEOUT_SECS;
+	tv.tv_usec = TIMEOUT_USECS;
+	setsockopt(socket_desc, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tv, sizeof tv);
+
 	// Bind
 	if(bind(socket_desc, (struct sockaddr *)&server, sizeof(server)) < 0)
 	{
@@ -268,31 +277,39 @@ void *listener(void *threadid)
 
 	char recieve[MAXMSG];
 
-	listen(sock, 3);
-	client_socket = accept(sock, (struct sockaddr *)&client, (socklen_t*)&c);
-	if (client_socket < 0) {
-		fprintf(stderr,"Accept Failed\n");
-	}
-	connected=1;
-
-	int bytes = 0;
-
 	while(running) {
-		for(int i=0; i < MAXMSG; i++)
-		{
-			recieve[i] = 0;
+		listen(sock, 3);
+		client_socket = accept(sock, (struct sockaddr *)&client, (socklen_t*)&c);
+		if (client_socket < 0) {
+			fprintf(stderr, "Timeout\n");
+			continue;
 		}
-		bytes = read(client_socket, recieve, MAXMSG);
-		if (bytes < 0)
-		{
-			fprintf(stderr,"Read Error!");
+		
+		connected=1;
+
+		int bytes = 0;
+
+		while(connected) {
+			for(int i=0; i < MAXMSG; i++)
+			{
+				recieve[i] = 0;
+			}
+			bytes = read(client_socket, recieve, MAXMSG);
+			if (bytes < 0)
+			{
+				fprintf(stderr,"Timeout");
+				break;
+			}
+			fprintf(stderr, recieve);
+			execute_command(recieve);
 		}
-		fprintf(stderr, recieve);
-		execute_command(recieve);
+		close(client_socket);
+		connected=0;
 	}
 	close(sock);
-	close(client_socket);
-	connected=0;
+
+	fprintf(stderr, "Exiting");
+
 	pthread_exit(NULL);
 }
 
@@ -310,19 +327,6 @@ void *render(void *threadid)
 		usleep(1000000 / 30);
 	}
 	pthread_exit(NULL);
-}
-
-// Flashing single led
-void startup() 
-{
-	while(!connected)
-	{
-		write_led(0, 0x00050505);
-		usleep(1000000);
-		write_led(0, 0);
-		usleep(1000000);
-	}
-	clear_ledstring();
 }
 
 int main(int argc, char *argv[])
@@ -363,7 +367,15 @@ int main(int argc, char *argv[])
 		exit(-1);
 	}
 
-	startup();
+	while(running){
+		while(!connected)
+		{
+			clear_ledstring();
+			usleep(1000000);
+			write_led(0, 0x00050505);
+			usleep(1000000);
+		}	
+	}
 
 	pthread_join(sock_thread, NULL);
 	pthread_join(render_thread, NULL);
