@@ -80,7 +80,7 @@ int sock;
 
 int clear_on_exit = 0;
 
-static uint8_t running = 1;
+static volatile uint8_t running = 1;
 static uint8_t initialized = 0;
 static uint8_t connected = 0;
 
@@ -139,21 +139,26 @@ void parseargs(int argc, char **argv)
 	}
 }
 
-static void ctrl_c_handler(int signum)
+static void ctrl_c_handler(int sig)
 {
-	(void)(signum);
-    running = 0;
+	// char c;
+
+	signal(sig, SIG_IGN);
+	// printf("Did you mean to hit Ctrl-C?\n [y/n]");
+	// c = getchar();
+	// if(c == 'y' || c == 'Y')
+	//     running = 0;
+	// else
+	// 	signal(SIGINT, ctrl_c_handler);
+
+	running = 0;
+
+	// getchar();
 }
 
 static void setup_handlers(void)
 {
-    struct sigaction sa =
-    {
-        .sa_handler = ctrl_c_handler,
-    };
-
-    sigaction(SIGINT, &sa, NULL);
-    sigaction(SIGTERM, &sa, NULL);
+	signal(SIGINT, ctrl_c_handler);
 }
 
 int socket_init(void)
@@ -306,10 +311,9 @@ void *listener(void *threadid)
 		close(client_socket);
 		connected=0;
 	}
+
 	close(sock);
-
-	fprintf(stderr, "Exiting");
-
+	fprintf(stderr, "Exit Socket Listener\n");
 	pthread_exit(NULL);
 }
 
@@ -326,6 +330,8 @@ void *render(void *threadid)
 		// 30 frames /sec
 		usleep(1000000 / 30);
 	}
+
+	fprintf(stderr, "Exit Render\n");
 	pthread_exit(NULL);
 }
 
@@ -367,14 +373,11 @@ int main(int argc, char *argv[])
 		exit(-1);
 	}
 
-	while(running){
-		while(!connected)
-		{
-			clear_ledstring();
-			usleep(1000000);
-			write_led(0, 0x00050505);
-			usleep(1000000);
-		}	
+	while(running && !connected){
+		clear_ledstring();
+		usleep(1000000);
+		write_led(0, 0x00050505);
+		usleep(1000000);
 	}
 
 	pthread_join(sock_thread, NULL);
