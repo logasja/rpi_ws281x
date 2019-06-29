@@ -70,7 +70,7 @@ static char VERSION[] = "XX.YY.ZZ";
 #define STRIP_TYPE              WS2811_STRIP_GBR		// WS2812/SK6812RGB integrated chip+leds
 //#define STRIP_TYPE            SK6812_STRIP_RGBW		// SK6812RGBW (NOT SK6812RGB)
 
-#define TIMEOUT_SECS			5
+#define TIMEOUT_SECS			30
 #define TIMEOUT_USECS			0
 
 #define LED_COUNT               2
@@ -141,24 +141,14 @@ void parseargs(int argc, char **argv)
 
 static void ctrl_c_handler(int sig)
 {
-	// char c;
-
 	signal(sig, SIG_IGN);
-	// printf("Did you mean to hit Ctrl-C?\n [y/n]");
-	// c = getchar();
-	// if(c == 'y' || c == 'Y')
-	//     running = 0;
-	// else
-	// 	signal(SIGINT, ctrl_c_handler);
-
 	running = 0;
-
-	// getchar();
 }
 
 static void setup_handlers(void)
 {
 	signal(SIGINT, ctrl_c_handler);
+	signal(SIGSEGV, sig_handler);
 }
 
 int socket_init(void)
