@@ -78,7 +78,7 @@ static char VERSION[] = "XX.YY.ZZ";
 int port = PORT;
 int sock;
 
-int clear_on_exit = 0;
+int clear_on_exit = 1;
 
 static volatile uint8_t running = 1;
 static uint8_t initialized = 0;
@@ -241,7 +241,20 @@ void parsecommand(int argc, char **argv)
 		}
 		fprintf(stderr, "Setting %d to %x\n", idx, color);
 		write_led(idx, color);
-	} 
+	}
+	else if (!strcmp(command, "fill"))
+	{
+		fprintf(stderr, "In fill\n");
+		ws2811_led_t color = 0;
+		while((opt = getopt(argc, argv, "c:")) != -1)
+		{
+			switch(opt) {
+				case 'c': color = strtol(optarg, NULL, 16); break;
+				default: break;
+			}
+		}
+		fill_leds(color);
+	}
 	else {
 		fprintf(stderr, "Not a command\n");
 	}

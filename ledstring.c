@@ -88,6 +88,14 @@ void write_leds(ws2811_led_t *vec)
     }
 }
 
+void fill_leds(ws2811_led_t val)
+{
+    for (int i = 0; i < led_struct.channel[0].count; i++)
+    {
+        led_values[i] = val;
+    }
+}
+
 void clear_ledstring(void)
 {
     for(int i = 0; i < led_struct.channel[0].count; i++)

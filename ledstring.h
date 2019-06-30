@@ -56,6 +56,7 @@ void set_ledstring_invert(int invert);
 void write_led(int idx, ws2811_led_t val);
 void write_leds(ws2811_led_t *vec);
 void clear_ledstring(void);
+void fill_leds(ws2811_led_t val);
 
 // Calls render function, sends LED values to hardware
 int render_ledstring(void);
