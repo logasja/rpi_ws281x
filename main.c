@@ -148,7 +148,7 @@ static void ctrl_c_handler(int sig)
 static void setup_handlers(void)
 {
 	signal(SIGINT, ctrl_c_handler);
-	signal(SIGSEGV, sig_handler);
+	signal(SIGSEGV, ctrl_c_handler);
 }
 
 int socket_init(void)
@@ -195,7 +195,10 @@ void parsecommand(int argc, char **argv)
 
 	fprintf(stderr,"Command: %s\n", argv[0]);
 
-	if(!strcmp(command, "setup"))
+	if(command == NULL){
+		connected=0;
+	}
+	else if(!strcmp(command, "setup"))
 	{
 		fprintf(stderr, "In setup\n");
 		while ((opt = getopt(argc, argv, "n:f:g:d:t:b:i")) != -1)
